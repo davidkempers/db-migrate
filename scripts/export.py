@@ -4,18 +4,21 @@ import subprocess
 import sys
 import select
 import csv
+import argparse
 
 path = ''
 
-def main(argv):
+def export(dburi):
 
-    dburi = 'system/oracle@//192.168.99.100:49161/xe'
     sqlfile = 'export-schema.sql'
     file = open(sqlfile, 'r')
     sql = file.read()
 
-    p = subprocess.Popen(["sqlplus", dburi], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.Popen(["sqlplus", dburi], stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     p.stdin.write(sql)
+    for row in csv.reader(iter(p.stdout.readline, '')):
+        parse_row(row)
     while True:
         reads = [p.stdout.fileno(), p.stderr.fileno()]
         ret = select.select(reads, [], [])
@@ -61,6 +64,3 @@ def parse_row(row):
             #fout.write('\n\n--changeset davkem02:' + str(i) + '\n')
             #fout.write(sql.replace('tablespace users', 'tablespace notifydata').replace('tablespace notifyidx', 'tablespace notifydata'))
             fout.write(sql)
-
-if __name__ == '__main__':
-   main(sys.argv[1:])

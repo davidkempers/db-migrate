@@ -117,7 +117,5 @@ def get_directory_versions(dir):
     for version in sorted(dir) if version[0].lower() == 'v' and not os.path.isfile(os.path.join(dir, version)):
         yield version
 
-
-
 if __name__ == '__main__':
    main(sys.argv[1:])

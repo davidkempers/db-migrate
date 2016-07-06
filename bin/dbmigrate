@@ -1,40 +1,18 @@
-#!/usr/bin/bash
+#!/bin/bash
 
-verbose='false'
-dblink=''
-bflag=''
-files=''
+working=$PWD
 
-display_usage() {
-	echo "Usage: dbmigrate <command> [common options] [command options]"
-  echo "command (required):"
-  echo "    generate        Create changelogs by reading SQL directory and git changes"
-  echo "    update          Run update database migrations"
-  echo "    rollback        Run database rollback"
-  echo "    diff            Create a db diff between update and rollback"
-  echo "    export          Export the schema of an existing database"
-	echo "common options:"
-  echo "    -d --database   Database uri username/password@host:port/sid (required)"
-  echo "    -w --working    Project directory with Git repo. Full path required."
-  echo "                    Defaults to CWD (optional)"
-  echo "    -s --sql        SQL directory if different to project directory. Relative"
-  echo "                    path to Project directory (optional)"
-  echo "command options:"
-  echo "  Run dbmigrate <command> --help for command usage"
+for (( i=1; i<=$#; i++)); do
 
-	}
-
-cmd=$1
-working=$cwd
-db=system/oracle@db/xe
-i=1
-while getopts 'd:w:s:' flag; do
-  case "${flag}" in
-    d) db="${OPTARG}" ;;
-    w) working="${OPTARG}" ;;
-    s) sqlpath="${OPTARG}" ;;
-    *) error "Unexpected option ${flag}" ;;
-  esac
+    case "${!i}" in
+        -w | --working)
+            j=$((i+1))
+            working="${!j}"
+            ;;
+    esac
 done
+if ! [ -d "$working" ]; then
+    working=$PWD
+fi
 
-docker run --rm -v $working:/changelogs dbmigrate $cmd "${@:i}"
+docker run --rm -v $working:/changelogs dbmigrate $@
