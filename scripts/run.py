@@ -6,9 +6,10 @@ import select
 import csv
 import argparse
 import dbmigrate
-import export
+import exporter
+from generate import create_changelog
 
-path = ''
+MOUNT_PATH = '/changelogs'
 
 def usage(name=None):
     return '''dbmigrate <command> [options]
@@ -36,6 +37,8 @@ class MyParser(argparse.ArgumentParser):
 
 def main(argv):
 
+    global MOUNT_PATH
+
     def update(args):
         dbmigrate.update(args.database, args.sqldir, args.version)
 
@@ -43,52 +46,56 @@ def main(argv):
         dbmigrate.update(args.database, args.sqldir, args.version)
 
     def export(args):
-        export.export(args.database, args.sqldir, args.version)
+        sqldir = os.path.join(MOUNT_PATH, args.sqldir)
+        if args.parsefile:
+            csvfile = os.path.join(MOUNT_PATH, args.parsefile)
+            exporter.tosql(sqldir, csvfile)
+        else:
+            exporter.export(args.database, sqldir)
 
     def diff(args):
         utils.diff(args.database, args.sqldir, args.version)
 
+    def generate(args):
+        sqldir = os.path.join(MOUNT_PATH, args.sqldir)
+        create_changelog(sqldir)
+
     parser = MyParser(description='Migration scripts for oracle database',
                                      usage=usage())
+
+    parser.add_argument('-d', '--database',
+                     help='Database uri username/password@host:port/sid')
+    parser.add_argument('-s', '--sqldir',
+                     help='SQL directory relative to the working directory')
+
     subparsers = parser.add_subparsers()
     parser_update = subparsers.add_parser('update')
-    parser_update.add_argument('-d', '--database',
+    '''parser_update.add_argument('-d', '--database',
                         help='Database uri username/password@host:port/sid')
     parser_update.add_argument('-s', '--sqldir',
-                        help='SQL directory relative to the working directory')
+                        help='SQL directory relative to the working directory')'''
     parser_update.add_argument("version", help="Version")
     parser_update.set_defaults(func=update)
+
+    parser_export = subparsers.add_parser('export')
+    parser_export.set_defaults(func=export)
+    parser_export.add_argument('-f', '--parsefile',
+                    help='Specify a csv file to parse')
+
+    parser_generate = subparsers.add_parser('generate')
+    parser_generate.set_defaults(func=generate)
+
     args = parser.parse_args()
     args.func(args)
 
 
-    sys.exit(0)
-
 if __name__ == '__main__':
     try:
         main(sys.argv[1:])
+        sys.exit(0)
     except Exception as err:
         import traceback
         sys.stderr.write(str(err) + '\n')
         sys.stderr.write(traceback.format_exc())
         sys.stderr.write('\n')
         sys.exit(1)
-
-'''#!/bin/bash
-
-# entry point script for docker
-echo $@
-cmd=$1
-shift
-
-if [[ $cmd == "update" ]]; then
-    python /scripts/migrate.py {$@}
-elif [[ $cmd == "rollback" ]]; then
-    python /scripts/migrate.py {$@}
-elif [[ $cmd == "diff" ]]; then
-    python /scripts/migrate.py {$@}
-elif [[ $cmd == "generate" ]]; then
-    python /scripts/generate.py {$@}
-elif [[ $cmd == "export" ]]; then
-    python /scripts/export.py {$@}
-fi'''

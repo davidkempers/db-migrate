@@ -47,10 +47,12 @@ RUN rm /tmp/liquibase.tar.gz /tmp/basic.rpm /tmp/sqlplus.rpm
 ADD scripts /scripts
 RUN chmod -R +x /scripts
 
-RUN apt-get install -y python-pip
+RUN apt-get install -y python-pip python-lxml
+# libxml2-dev libxslt1-dev python-dev
 #python-dev build-essential
 #RUN pip install --upgrade pip
 RUN pip install gitpython
+#RUN pip install lxml
 
 VOLUME ["/changelogs"]
 

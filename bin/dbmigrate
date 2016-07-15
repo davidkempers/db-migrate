@@ -11,8 +11,11 @@ for (( i=1; i<=$#; i++)); do
             ;;
     esac
 done
+# if not a directory then default to the current working directory
 if ! [ -d "$working" ]; then
     working=$PWD
 fi
 
+# run the container mounting the working directory
+# the entry point will pass the container arguments
 docker run --rm -v $working:/changelogs dbmigrate $@
