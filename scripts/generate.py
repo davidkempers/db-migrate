@@ -7,11 +7,18 @@ import utils
 
 def create_changelog(dir):
     changesets = utils.get_changesets(dir)
+    if len(changesets) == 0:
+        print('No sql file changes detected in %s' % dir)
+        return
 
-    if not os.path.exists('install.xml'):
+    installxml = os.path.join(dir, 'install.xml')
+    #if utils.get_last_release is None or not os.path.exists(installxml) or
+    if utils.is_new_file(dir, installxml):
+        if os.path.exists(installxml):
+            os.path.remove(installxml)
         create_installxml(dir, changesets)
     else:
-        if not os.path.exists('update.xml'):
+        if not os.path.exists(os.path.join(dir, 'update.xml')):
             create_updatexml(dir)
 
         next_release = utils.get_next_release(dir)
@@ -22,11 +29,6 @@ def create_installxml(dir, changesets):
     xmlfile = os.path.join(dir, 'install.xml')
     root = get_changelogxml(xmlfile)
 
-    # another child with text
-    child = etree.Element('child')
-    child.text = 'some text'
-    root.append(child)
-
     for cs in changesets:
 
         include = etree.Element('include')
@@ -34,8 +36,11 @@ def create_installxml(dir, changesets):
         include.set('relativeToChangelogFile', 'true')
         root.append(include)
 
-    et = etree.ElementTree(root)
-    et.write(xmlfile, pretty_print=True)
+    if len(changesets) > 0:
+        elem_tag = etree.Element('tagDatabase')
+        elem_tag.set('tag', 'install')
+        et = etree.ElementTree(root)
+        et.write(xmlfile, pretty_print=True)
 
 def create_updatexml(dir):
     xmlfile = os.path.join(dir, 'update.xml')
@@ -48,8 +53,11 @@ def create_updatexml(dir):
 
     for version in utils.get_directory_versions(dir):
         include = etree.Element('include')
-        include.text = os.path.join(dir, 'master.xml')
-        root.append(include)
+        masterxml = os.path.join(dir, version, 'master.xml')
+        if os.path.exists(masterxml):
+            include.set('file', masterxml)
+            include.set('relativeToChangelogFile', 'true')
+            root.append(include)
 
     et = etree.ElementTree(root)
     et.write(xmlfile, pretty_print=True)
@@ -58,22 +66,26 @@ def update_updatexml(dir, version_xmlfile):
     xmlfile = os.path.join(dir, 'update.xml')
     root = get_changelogxml(xmlfile)
 
-    include = etree.Element('include')
-    include.set('file', 'install.xml')
-    include.set('relativeToChangelogFile', 'true')
-    root.append(include)
+    if os.path.exists(version_xmlfile):
+        include.set('file', version_xmlfile)
+        include.set('relativeToChangelogFile', 'true')
+        root.append(include)
 
-    et = etree.ElementTree(root)
-    et.write(xmlfile, pretty_print=True)
+        et = etree.ElementTree(root)
+        et.write(xmlfile, pretty_print=True)
 
 def create_versionxml(dir, version, changesets):
-    xmlfile = os.path.join(dir, 'master.xml')
+    versiondir = os.path.join(dir, version)
+    if not os.path.exists(versiondir):
+        os.mkdir(versiondir)
+    xmlfile = os.path.join(versiondir, 'master.xml')
     root = get_changelogxml(xmlfile)
 
     for cs in changesets:
-
         elem = etree.Element('changeSet')
-        elem.set('file', cs.file)
+        # move back a directory for relative path
+        relative_path = os.path.join('..', cs.file)
+        elem.set('file', relative_path)
         elem.set('relativeToChangelogFile', 'true')
         # for a latest object we can automatically create the rollback
         if cs.location == 'latest':
@@ -85,19 +97,24 @@ def create_versionxml(dir, version, changesets):
                 # rollback to a particular version of the file
                 # use git checkout <tag> <filename> to revert this file
                 elem_sqlfile = etree.Element('sqlFile')
-                # move back a directory for relative path
-                elem_sqlfile.set('file', os.path.join('..', cs.file))
+                elem_sqlfile.set('file', relative_path)
                 elem_sqlfile.set('relativeToChangelogFile', 'true')
                 elem_rb.append(elem_sqlfile)
-            elem.append(rollback)
+            elem.append(elem_rb)
         root.append(elem)
 
-    et = etree.ElementTree(root)
-    et.write(xmlfile, pretty_print=True)
+    if len(changesets) > 0:
+        elem_tag = etree.Element('tagDatabase')
+        elem_tag.set('tag', version)
+        root.append(elem_tag)
+        et = etree.ElementTree(root)
+        et.write(xmlfile, pretty_print=True)
+
+        update_updatexml(dir, xmlfile)
 
 def get_changelogxml(xmlfile):
     if os.path.exists(xmlfile):
-        changelog = etree.iterparse()
+        changelog = etree.iterparse(xmlfile)
     else:
         xml = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <databaseChangeLog

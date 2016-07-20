@@ -1,0 +1,2 @@
+
+MOUNT_PATH = '/changelogs'

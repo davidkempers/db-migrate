@@ -8,8 +8,7 @@ import argparse
 import dbmigrate
 import exporter
 from generate import create_changelog
-
-MOUNT_PATH = '/changelogs'
+import config
 
 def usage(name=None):
     return '''dbmigrate <command> [options]
@@ -37,18 +36,16 @@ class MyParser(argparse.ArgumentParser):
 
 def main(argv):
 
-    global MOUNT_PATH
-
     def update(args):
         dbmigrate.update(args.database, args.sqldir, args.version)
 
     def rollback(args):
-        dbmigrate.update(args.database, args.sqldir, args.version)
+        dbmigrate.rollback(args.database, args.sqldir, args.version)
 
     def export(args):
-        sqldir = os.path.join(MOUNT_PATH, args.sqldir)
+        sqldir = os.path.join(config.MOUNT_PATH, args.sqldir)
         if args.parsefile:
-            csvfile = os.path.join(MOUNT_PATH, args.parsefile)
+            csvfile = os.path.join(config.MOUNT_PATH, args.parsefile)
             exporter.tosql(sqldir, csvfile)
         else:
             exporter.export(args.database, sqldir)
@@ -57,7 +54,7 @@ def main(argv):
         utils.diff(args.database, args.sqldir, args.version)
 
     def generate(args):
-        sqldir = os.path.join(MOUNT_PATH, args.sqldir)
+        sqldir = os.path.join(config.MOUNT_PATH, args.sqldir)
         create_changelog(sqldir)
 
     parser = MyParser(description='Migration scripts for oracle database',

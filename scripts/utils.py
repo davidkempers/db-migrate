@@ -1,5 +1,7 @@
 import os
 import git
+import config
+from changeset import ChangeSet
 
 def get_repo(basedir):
     repopath = find_repo(basedir)
@@ -27,33 +29,40 @@ def parse_dburi(dburi):
     return (username, password, uri)
 
 def get_changesets(dir):
+
     repo = get_repo(dir)
     last_release = get_last_release(dir)
     files = []
     print('last release', last_release)
     if last_release:
-        files = repo.git.diff('--nameonly %s' % last_release)
+        output = repo.git.diff('--name-only', last_release)
         if output:
             files += output.split('\n')
-    #files.append(repo.git.diff_index('--cached', 'HEAD'))
+    # get pre-commit files
     output = repo.git.diff('--cached', '--name-only')
     if output:
         files += output.split('\n')
+
     changesets = []
+    #sqldir = dir[len(config.MOUNT_PATH):]
+    if dir.endswith('/'):
+        dir = dir[:-1]
     for f in files:
-        if dir in f:
-            file_path = os.path.join(dir, f)
-            if not os.path.exists(file_path):
-                continue
+        file_path = os.path.join(config.MOUNT_PATH, f)
+        if file_path.startswith(dir) and f.endswith('.sql'):
+            f = file_path[len(dir)+1:]
+            #if not os.path.exists(file_path):
+            #    continue
             splits = f.split('/')
-            location = splits[0]
-            schema = splits[1]
-            name = splits[2]
-            type = splits[3]
-            sql = open(file_path, 'r').read()
-            cs = ChangeSet(location=location, schema=schema, name=name, type=type, sql=sql)
-            pos = get_dependency_position(cs, changesets)
-            changesets.insert(pos, cs)
+            if len(splits) == 4:
+                location = splits[0]
+                schema = splits[2]
+                name = splits[3][:-4]
+                type = splits[1]
+                sql = '';#open(file_path, 'r').read()
+                cs = ChangeSet(location=location, schema=schema, name=name, type=type, sql=sql)
+                pos = get_dependency_position(cs, changesets)
+                changesets.insert(pos, cs)
     return changesets
 
 def get_dependency_position(changeset, changesets):
@@ -100,20 +109,27 @@ def get_directory_versions(dir):
 
 def get_releases(dir):
     repo = get_repo(dir)
-    branches = repo.git.branch('-r')
-    print(branches)
-    return
+    tags = []
+    output = repo.git.ls_remote('--tags')
+    print('output', output)
+    output += '\n' + repo.git.tag()
+    if output:
+        tags = output.split('\n')
+    print('output', output)
     releases = []
-    for branch in sorted(branches):
-        if branch[0] != 'v':
-            releases.append(branch)
-    return releases
+    for tag in tags:
+        if tag.lower().startswith('v') and tag not in releases:
+            releases.append(tag)
+    print('releases', tags)
+    return sorted(releases)
 
 def is_new_file(dir, file):
     repo = get_repo(dir)
     last_release = get_last_release(dir)
-    try:
-        repo.git('cat-file -e %s:%s')
-        return True
-    except:
-        return False
+    if last_release:
+        try:
+            repo.git('cat-file -e %s:%s' % (last_release, file))
+            return False
+        except:
+            pass
+    return True
