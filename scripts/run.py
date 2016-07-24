@@ -54,8 +54,8 @@ def main(argv):
         utils.diff(args.database, args.sqldir, args.version)
 
     def generate(args):
-        sqldir = os.path.join(config.MOUNT_PATH, args.sqldir)
-        create_changelog(sqldir)
+        dir = os.path.join(config.MOUNT_PATH, args.sqldir)
+        create_changelog(dir, args.sqldir)
 
     parser = MyParser(description='Migration scripts for oracle database',
                                      usage=usage())
