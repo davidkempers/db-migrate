@@ -24,14 +24,34 @@ def create_changelog(dir, sqldir):
 
 def create_installxml(dir, changesets):
     xmlfile = os.path.join(dir, 'install.xml')
+
+    if os.path.exists(xmlfile):
+        os.remove(xmlfile)
+
     root = get_changelogxml(xmlfile)
 
     for cs in changesets:
 
-        include = etree.Element('include')
-        include.set('file', cs.file)
-        include.set('relativeToChangelogFile', 'true')
-        root.append(include)
+        #include = etree.Element('include')
+        #include.set('file', cs.file)
+        #include.set('relativeToChangelogFile', 'true')
+        #root.append(include)
+
+        elem_cs = etree.Element('changeSet')
+
+        elem_sf = etree.Element('sqlFile')
+        elem_sf.set('file', relative_path)
+        elem_sf.set('relativeToChangelogFile', 'true')
+        elem_cs.append(elem_sf)
+
+        # rollback element
+        elem_rb = etree.Element('rollback')
+        # if this is a new file then rollback is to drop
+        if cs.type in ['package', 'trigger', 'view', 'table', 'procedure']:
+            elem_rb.text = 'drop %s %s;' % (self.type, self.fullname)
+        elem_cs.append(elem_rb)
+
+        root.append(elem_cs)
 
     if len(changesets) > 0:
         elem_tag = etree.Element('tagDatabase')
@@ -89,6 +109,7 @@ def create_versionxml(dir, sqldir, version, changesets):
 
     for cs in changesets:
         elem_cs = etree.Element('changeSet')
+
         if cs.location == 'latest':
             # move back a directory for relative path
             relative_path = os.path.join('..', cs.file)

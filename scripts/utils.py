@@ -65,6 +65,7 @@ def get_changesets(dir):
     return changesets
 
 def get_dependency_position(changeset, changesets):
+
     pos = 0
     this_name = changeset.fullname.lower()
     this_sql = changeset.sql.lower()
@@ -72,14 +73,14 @@ def get_dependency_position(changeset, changesets):
         # if in the list it is referernced in the sql
         cs_name = cs.fullname.lower()
         sql = cs.sql.lower()
-        print(cs_name, this_sql)
-        if cs_name in this_sql:
+        #print(cs_name, this_sql)
+        if cs_name in this_sql or cs.type in ['tablespace']:
             pos = i + 1
-            print ('%s is in %s' % (cs_name, this_name))
+            #print ('%s is in %s' % (cs_name, this_name))
         # if this object is in the sql in the list
         # but
         if this_name in sql:
-            print ('this %s is in %s' % (this_name, cs.name))
+            #print ('this %s is in %s' % (this_name, cs.name))
             pos = i
             break
     return pos
