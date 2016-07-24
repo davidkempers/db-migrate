@@ -37,10 +37,10 @@ class MyParser(argparse.ArgumentParser):
 def main(argv):
 
     def update(args):
-        dbmigrate.update(args.database, args.sqldir, args.version)
+        dbmigrate.update(args.database, args.sqldir, args.version, args.outputsql)
 
     def rollback(args):
-        dbmigrate.rollback(args.database, args.sqldir, args.version)
+        dbmigrate.rollback(args.database, args.sqldir, args.version, args.outputsql)
 
     def export(args):
         sqldir = os.path.join(config.MOUNT_PATH, args.sqldir)
@@ -67,12 +67,16 @@ def main(argv):
 
     subparsers = parser.add_subparsers()
     parser_update = subparsers.add_parser('update')
-    '''parser_update.add_argument('-d', '--database',
-                        help='Database uri username/password@host:port/sid')
-    parser_update.add_argument('-s', '--sqldir',
-                        help='SQL directory relative to the working directory')'''
     parser_update.add_argument("version", help="Version")
+    parser_update.add_argument('-o', '--outputsql',
+                               help="Output sql and not apply cnanges")
     parser_update.set_defaults(func=update)
+
+    parser_rollback = subparsers.add_parser('update')
+    parser_rollback.add_argument("version", help="Version")
+    parser_rollback.add_argument('-o', '--outputsql',
+                                 help="Output sql and not apply cnanges")
+    parser_rollback.set_defaults(func=update)
 
     parser_export = subparsers.add_parser('export')
     parser_export.set_defaults(func=export)
