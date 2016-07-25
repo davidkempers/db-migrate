@@ -30,7 +30,7 @@ def create_installxml(dir, changesets):
 
     root = get_changelogxml(xmlfile)
 
-    for cs in changesets:
+    for i, cs in enumerate(changesets):
 
         #include = etree.Element('include')
         #include.set('file', cs.file)
@@ -38,24 +38,25 @@ def create_installxml(dir, changesets):
         #root.append(include)
 
         elem_cs = etree.Element('changeSet')
+        elem_cs.set('id', 'install-%d' % (i + 1))
+        elem_cs.set('author', cs.author)
 
         elem_sf = etree.Element('sqlFile')
-        elem_sf.set('file', relative_path)
+        elem_sf.set('path', cs.file)
         elem_sf.set('relativeToChangelogFile', 'true')
         elem_cs.append(elem_sf)
-
-        # rollback element
-        elem_rb = etree.Element('rollback')
-        # if this is a new file then rollback is to drop
-        if cs.type in ['package', 'trigger', 'view', 'table', 'procedure']:
-            elem_rb.text = 'drop %s %s;' % (self.type, self.fullname)
-        elem_cs.append(elem_rb)
 
         root.append(elem_cs)
 
     if len(changesets) > 0:
+
+        elem_cs = etree.Element('changeSet')
+        elem_cs.set('id', 'install-%d' % (i + 2))
+        elem_cs.set('author', cs.author)
         elem_tag = etree.Element('tagDatabase')
         elem_tag.set('tag', 'install')
+        elem_cs.append(elem_tag)
+        root.append(elem_cs)
         et = etree.ElementTree(root)
         et.write(xmlfile, pretty_print=True)
 
@@ -75,7 +76,7 @@ def create_updatexml(dir):
     for version in utils.get_directory_versions(dir):
         include = etree.Element('include')
         masterxml = os.path.join(version, 'master.xml')
-        if os.path.exists(masterxml):
+        if os.path.exists(os.path.join(dir, masterxml)):
             include.set('file', masterxml)
             include.set('relativeToChangelogFile', 'true')
             root.append(include)
@@ -107,8 +108,7 @@ def create_versionxml(dir, sqldir, version, changesets):
         os.remove(xmlfile)
     root = get_changelogxml(xmlfile)
 
-    for cs in changesets:
-        elem_cs = etree.Element('changeSet')
+    for i, cs in enumerate(changesets):
 
         if cs.location == 'latest':
             # move back a directory for relative path
@@ -116,35 +116,50 @@ def create_versionxml(dir, sqldir, version, changesets):
         else:
             # take off the version directory
             relative_path = cs.file[len(version) + 1:]
-        elem_sf = etree.Element('sqlFile')
-        elem_sf.set('file', relative_path)
-        elem_sf.set('relativeToChangelogFile', 'true')
-        elem_cs.append(elem_sf)
 
-        # rollback element
-        elem_rb = etree.Element('rollback')
-        if utils.is_new_file(dir, os.path.join(sqldir, cs.file)):
-            # if this is a new file then rollback is to drop
-            if cs.type in ['package', 'trigger', 'view', 'table', 'procedure']:
-                elem_rb.text = 'drop %s %s;' % (self.type, self.fullname)
+        if cs.is_formated_sql:
+            include = etree.Element('include')
+            include.set('file', relative_path)
+            include.set('relativeToChangelogFile', 'true')
+            root.append(include)
         else:
-            # for a latest object we can automatically create the rollback
-            # by either droping or reverting the file to previous version
-            if cs.location == 'latest':
-                # rollback to a particular version of the file
-                # use git checkout <tag> <filename> to revert this file
-                elem_sqlfile = etree.Element('sqlFile')
-                elem_sqlfile.set('file', relative_path)
-                elem_sqlfile.set('relativeToChangelogFile', 'true')
-                elem_rb.append(elem_sqlfile)
-        elem_cs.append(elem_rb)
+            elem_cs = etree.Element('changeSet')
+            elem_cs.set('id', '%s-%d' % (version, i + 1))
+            elem_cs.set('author', cs.author)
 
-        root.append(elem_cs)
+            elem_sf = etree.Element('sqlFile')
+            elem_sf.set('path', relative_path)
+            elem_sf.set('relativeToChangelogFile', 'true')
+            elem_cs.append(elem_sf)
+
+            # rollback element
+            elem_rb = etree.Element('rollback')
+            if utils.is_new_file(dir, os.path.join(sqldir, cs.file)):
+                # if this is a new file then rollback is to drop
+                if cs.type in ['package', 'trigger', 'view', 'table', 'procedure']:
+                    elem_rb.text = 'drop %s %s;' % (cs.type, cs.fullname)
+            else:
+                # for a latest object we can automatically create the rollback
+                # by either droping or reverting the file to previous version
+                if cs.location == 'latest':
+                    # rollback to a particular version of the file
+                    # use git checkout <tag> <filename> to revert this file
+                    elem_sqlfile = etree.Element('sqlFile')
+                    elem_sqlfile.set('file', relative_path)
+                    elem_sqlfile.set('relativeToChangelogFile', 'true')
+                    elem_rb.append(elem_sqlfile)
+            elem_cs.append(elem_rb)
+            root.append(elem_cs)
 
     if len(changesets) > 0:
+
+        elem_cs = etree.Element('changeSet')
+        elem_cs.set('id', version)
+        elem_cs.set('author', 'system')
         elem_tag = etree.Element('tagDatabase')
         elem_tag.set('tag', version)
-        root.append(elem_tag)
+        elem_cs.append(elem_tag)
+        root.append(elem_cs)
         et = etree.ElementTree(root)
         et.write(xmlfile, pretty_print=True)
 

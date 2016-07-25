@@ -14,25 +14,32 @@ def update(dburi, sqldir, version, outputsql=False):
         xmlpath = os.path.join(sqldir, 'install.xml')
     else:
         xmlpath = os.path.join(sqldir, 'update.xml')
-        repo = utils.get_repo(sqldir)
-        # make sure we're on the correct version
-        repo.git.checkout(version)
+        if version is not None:
+            repo = utils.get_repo(sqldir)
+            # make sure we're on the correct version
+            repo.git.checkout(version)
 
     execute(cmd, dburi, xmlpath)
 
 def rollback(dburi, sqldir, version, outputsql=False):
 
-    cmd = 'rollback %' % (version)
+    cmd = 'rollback %s' % (version)
     if outputsql:
-        cmd = 'rollbackSQL %' % (version)
+        cmd = 'rollbackSQL %s' % (version)
 
-    xmlpath = os.path.join(dir, 'update.xml')
+    xmlpath = os.path.join(sqldir, 'update.xml')
+
+    repo = utils.get_repo(sqldir)
 
     # make sure we're on the latest version for the rollback sql
-    repo.git.checkout('master')
-
-    # checkout the latest folder to the version we want to rollback to
-    repo.git.checkout(version, '-- latest')
+    latest = utils.get_last_release(sqldir)
+    print('rollback to ', latest)
+    #repo.git.checkout(latest)
+    try:
+        # checkout the latest folder to the version we want to rollback to
+        repo.git.checkout(version, '--', 'latest')
+    except:
+        pass
 
     execute(cmd, dburi, xmlpath)
 

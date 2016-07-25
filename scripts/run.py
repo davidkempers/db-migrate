@@ -67,24 +67,26 @@ def main(argv):
 
     subparsers = parser.add_subparsers()
     parser_update = subparsers.add_parser('update')
-    parser_update.add_argument("version", help="Version")
-    parser_update.add_argument('-o', '--outputsql',
+    parser_update.add_argument('version', nargs='?', default=None, help='Version')
+    parser_update.add_argument('-o', '--outputsql', action='store_true',
                                help="Output sql and not apply cnanges")
     parser_update.set_defaults(func=update)
 
-    parser_rollback = subparsers.add_parser('update')
-    parser_rollback.add_argument("version", help="Version")
-    parser_rollback.add_argument('-o', '--outputsql',
-                                 help="Output sql and not apply cnanges")
-    parser_rollback.set_defaults(func=update)
+    parser_rollback = subparsers.add_parser('rollback')
+    parser_rollback.add_argument('version', help='Version')
+    parser_rollback.add_argument('-o', '--outputsql', action='store_true',
+                                 help='Output sql and not apply changes')
+    parser_rollback.set_defaults(func=rollback)
 
     parser_export = subparsers.add_parser('export')
     parser_export.set_defaults(func=export)
     parser_export.add_argument('-f', '--parsefile',
-                    help='Specify a csv file to parse')
+                               help='Specify a csv file to parse')
 
     parser_generate = subparsers.add_parser('generate')
     parser_generate.set_defaults(func=generate)
+    parser_generate.add_argument('-a', '--author',
+                                 help='Specify the author in the changesets')
 
     args = parser.parse_args()
     args.func(args)

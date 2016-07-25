@@ -51,13 +51,13 @@ def get_changesets(dir):
     for f in files:
         file_path = os.path.join(config.MOUNT_PATH, f)
         if file_path.startswith(dir) and f.endswith('.sql'):
-            f = file_path[len(dir)+1:]
             #if not os.path.exists(file_path):
             #    continue
             try:
-
+                author = get_author(dir, f)
                 sql = open(file_path, 'r').read()
-                cs = ChangeSet(file=f, sql=sql)
+                f = file_path[len(dir)+1:]
+                cs = ChangeSet(file=f, sql=sql, author=author)
                 pos = get_dependency_position(cs, changesets)
                 changesets.insert(pos, cs)
             except Exception as err:
@@ -95,7 +95,11 @@ def get_last_release(dir):
 def get_next_release(dir):
     last_release = get_last_release(dir)
     if not last_release:
-        return '1.0'
+        # look in the directory to see what version might be
+        versions = get_directory_versions(dir)
+        if len(versions) == 0:
+            return 'v1.0.0'
+        return versions[-1]
     splits = last_release.split('.')
     major = splits[0]
     minor = int(splits[1]) + 1
@@ -105,10 +109,10 @@ def get_next_release(dir):
 
 def get_directory_versions(dir):
     versions = []
-    for version in sorted(os.listdir(dir)):
+    for version in os.listdir(dir):
         if version[0].lower() == 'v' and not os.path.isfile(os.path.join(dir, version)):
             versions.append(version)
-    return versions
+    return sorted(versions)
 
 def get_releases(dir):
     repo = get_repo(dir)
@@ -129,12 +133,24 @@ def get_releases(dir):
 def is_new_file(dir, file):
     repo = get_repo(dir)
     last_release = get_last_release(dir)
-    if last_release:
-        try:
-            ret = repo.git.cat_file('-e', '%s:%s' % (last_release, file))
-            print ret
-            return False
-        except Exception as err:
-            print(str(err))
-            pass
+    if not last_release:
+        last_release = 'install'
+    try:
+        ret = repo.git.cat_file('-e', '%s:%s' % (last_release, file))
+        print ret
+        return False
+    except Exception as err:
+        # TODO check the error type
+        pass
     return True
+
+def get_author(dir, file):
+    repo = get_repo(dir)
+    log = repo.git.log(file)
+    if not log:
+        # maybe get the last commit author??
+        log = repo.git.log()
+    for line in log:
+        if 'Author: ' == line[0:8]:
+            return line[8:]
+    return os.environ['HOST_USER']

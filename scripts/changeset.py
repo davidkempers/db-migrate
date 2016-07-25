@@ -33,6 +33,10 @@ class ChangeSet:
             self.types = self.type
         self.file = os.path.join(self.location, self.types, self.schema, self.name + '.sql')
         self.fullname ='%s.%s' % (self.schema, self.name)
+        self.author = kwargs['author']
+        liquibase_sql = '--liquibase formatted sql'
+        self.is_formated_sql = liquibase_sql == self.sql[0:len(liquibase_sql)]
+
 
     def __str__(self):
         return self.fullname
