@@ -4,6 +4,11 @@ import os
 import sys
 from lxml import etree
 import utils
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger()
+logging.StreamHandler(sys.stdout)
 
 def create_changelog(dir, sqldir):
     changesets = utils.get_changesets(dir)
@@ -19,7 +24,7 @@ def create_changelog(dir, sqldir):
         #if not os.path.exists(os.path.join(dir, 'update.xml')):
         #    create_updatexml(dir)
         next_release = utils.get_next_release(dir)
-        print(next_release)
+        logger.debug('next release is %s', next_release)
         create_versionxml(dir, sqldir, next_release, changesets)
 
 def create_installxml(dir, changesets):

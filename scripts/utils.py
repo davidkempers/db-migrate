@@ -2,13 +2,22 @@ import os
 import git
 import config
 from changeset import ChangeSet
+import logging
+import sys
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger()
+logging.StreamHandler(sys.stdout)
+#ch.setLevel(logging.DEBUG)
+#formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+#ch.setFormatter(formatter)
+#logger.addHandler(ch)
 
 def get_repo(basedir):
     repopath = find_repo(basedir)
     if not repopath:
        Exception("Cannot find '.git' repository")
 
-    print(repopath)
     return git.Repo(repopath)
 
 def find_repo(basedir):
@@ -21,7 +30,6 @@ def find_repo(basedir):
 
 
 def parse_dburi(dburi):
-    print(dburi)
     parts = dburi.split('@')
     username = parts[0].split('/')[0]
     password = parts[0].split('/')[-1]
@@ -33,7 +41,6 @@ def get_changesets(dir):
     repo = get_repo(dir)
     last_release = get_last_release(dir)
     files = []
-    print('last release', last_release)
     if last_release:
         output = repo.git.diff('--name-only', last_release)
         if output:
@@ -51,17 +58,18 @@ def get_changesets(dir):
     for f in files:
         file_path = os.path.join(config.MOUNT_PATH, f)
         if file_path.startswith(dir) and f.endswith('.sql'):
-            #if not os.path.exists(file_path):
-            #    continue
+            logger.info('File changeset %s', f)
+            if not os.path.exists(file_path):
+                continue
+            author = get_author(dir, f)
             try:
-                author = get_author(dir, f)
                 sql = open(file_path, 'r').read()
                 f = file_path[len(dir)+1:]
                 cs = ChangeSet(file=f, sql=sql, author=author)
                 pos = get_dependency_position(cs, changesets)
                 changesets.insert(pos, cs)
             except Exception as err:
-                print(str(err))
+                logger.debug('file has not been committed %s', err)
     return changesets
 
 def get_dependency_position(changeset, changesets):
@@ -108,40 +116,46 @@ def get_next_release(dir):
     return next_release
 
 def get_directory_versions(dir):
+    logger.debug('list file in %s', dir)
     versions = []
-    for version in os.listdir(dir):
+    for version in sorted(os.listdir(dir)):
         if version[0].lower() == 'v' and not os.path.isfile(os.path.join(dir, version)):
+            logger.debug('version found %s', version)
             versions.append(version)
-    return sorted(versions)
+    return versions
 
 def get_releases(dir):
     repo = get_repo(dir)
     tags = []
     output = repo.git.ls_remote('--tags')
-    #print('output', output)
     output += '\n' + repo.git.tag()
     if output:
         tags = output.split('\n')
-    #print('output', output)
     releases = []
     for tag in tags:
         if tag.lower().startswith('v') and tag not in releases:
             releases.append(tag)
-    #print('releases', tags)
     return sorted(releases)
 
 def is_new_file(dir, file):
     repo = get_repo(dir)
     last_release = get_last_release(dir)
-    if not last_release:
-        last_release = 'install'
-    try:
-        ret = repo.git.cat_file('-e', '%s:%s' % (last_release, file))
-        print ret
-        return False
-    except Exception as err:
-        # TODO check the error type
-        pass
+    if last_release:
+        try:
+            ret = repo.git.cat_file('-e', '%s:%s' % (last_release, file))
+            return False
+        except Exception as err:
+            logger.debug('file not in release %s', err)
+            # TODO check the error type
+            pass
+    else:
+        try:
+            ret = repo.git.log(file)
+            return False
+        except Exception as err:
+            logger.debug('file has not been committed %s', err)
+            # TODO check the error type
+            pass
     return True
 
 def get_author(dir, file):
@@ -150,7 +164,10 @@ def get_author(dir, file):
     if not log:
         # maybe get the last commit author??
         log = repo.git.log()
-    for line in log:
-        if 'Author: ' == line[0:8]:
-            return line[8:]
+    for line in log.split('\n'):
+        if line.startswith('Author: '):
+            # TODO convert to regex
+            return line[8:].split('<')[0].strip()
+
+    logger.info('No author found for file %s' % file)
     return os.environ['HOST_USER']
