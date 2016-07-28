@@ -4,16 +4,12 @@ import os
 import sys
 from lxml import etree
 import utils
-import logging
-
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger()
-logging.StreamHandler(sys.stdout)
+from config import logger
 
 def create_changelog(dir, sqldir):
     changesets = utils.get_changesets(dir)
     if len(changesets) == 0:
-        print('No sql file changes detected in %s' % dir)
+        logger.info('No sql file changes detected in %s' % dir)
         return
 
     installxml = os.path.join(sqldir, 'install.xml')
@@ -24,7 +20,6 @@ def create_changelog(dir, sqldir):
         #if not os.path.exists(os.path.join(dir, 'update.xml')):
         #    create_updatexml(dir)
         next_release = utils.get_next_release(dir)
-        logger.debug('next release is %s', next_release)
         create_versionxml(dir, sqldir, next_release, changesets)
 
 def create_installxml(dir, changesets):
@@ -64,6 +59,7 @@ def create_installxml(dir, changesets):
         root.append(elem_cs)
         et = etree.ElementTree(root)
         et.write(xmlfile, pretty_print=True)
+        logger.info('Created %s' % xmlfile)
 
 def create_updatexml(dir):
     xmlfile = os.path.join(dir, 'update.xml')
@@ -88,6 +84,7 @@ def create_updatexml(dir):
 
     et = etree.ElementTree(root)
     et.write(xmlfile, pretty_print=True)
+    logger.info('Created %s' % xmlfile)
 
 def update_updatexml(dir, version_xmlfile):
     xmlfile = os.path.join(dir, 'update.xml')
@@ -135,24 +132,38 @@ def create_versionxml(dir, sqldir, version, changesets):
             elem_sf = etree.Element('sqlFile')
             elem_sf.set('path', relative_path)
             elem_sf.set('relativeToChangelogFile', 'true')
+            elem_sf.set('stripComments', 'true')
             elem_cs.append(elem_sf)
 
             # rollback element
             elem_rb = etree.Element('rollback')
-            if utils.is_new_file(dir, os.path.join(sqldir, cs.file)):
-                # if this is a new file then rollback is to drop
-                if cs.type in ['package', 'trigger', 'view', 'table', 'procedure']:
-                    elem_rb.text = 'drop %s %s;' % (cs.type, cs.fullname)
-            else:
-                # for a latest object we can automatically create the rollback
-                # by either droping or reverting the file to previous version
-                if cs.location == 'latest':
-                    # rollback to a particular version of the file
-                    # use git checkout <tag> <filename> to revert this file
+            if cs.location == version:
+                if cs.rollback_file:
                     elem_sqlfile = etree.Element('sqlFile')
-                    elem_sqlfile.set('file', relative_path)
+                    elem_sqlfile.set('path', cs.rollback_file[len(version) + 1:])
                     elem_sqlfile.set('relativeToChangelogFile', 'true')
+                    elem_sqlfile.set('stripComments', 'true')
                     elem_rb.append(elem_sqlfile)
+                else:
+                    sys.stderr.write('\n*** WARNING *** No rollback file included for %s\n' % cs.fullname)
+            else:
+                if utils.is_new_file(dir, os.path.join(sqldir, cs.file)):
+                    # if this is a new file then rollback is to drop
+                    # needs some testing for all the types
+                    if cs.type in ['package', 'trigger', 'view', 'table', 'procedure', 'function',
+                                   'index', 'sequence', 'type', 'schema', 'synonym', 'role']:
+                        elem_rb.text = 'drop %s %s;' % (cs.type, cs.fullname)
+                else:
+                    # for a latest object we can automatically create the rollback
+                    # by either droping or reverting the file to previous version
+                    if cs.location == 'latest':
+                        # rollback to a particular version of the file
+                        # use git checkout <tag> <filename> to revert this file
+                        elem_sqlfile = etree.Element('sqlFile')
+                        elem_sqlfile.set('path', relative_path)
+                        elem_sqlfile.set('relativeToChangelogFile', 'true')
+                        elem_sqlfile.set('stripComments', 'true')
+                        elem_rb.append(elem_sqlfile)
             elem_cs.append(elem_rb)
             root.append(elem_cs)
 
@@ -167,6 +178,7 @@ def create_versionxml(dir, sqldir, version, changesets):
         root.append(elem_cs)
         et = etree.ElementTree(root)
         et.write(xmlfile, pretty_print=True)
+        logger.info('Created %s' % xmlfile)
 
         create_updatexml(dir)
 

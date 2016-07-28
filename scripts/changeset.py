@@ -18,6 +18,8 @@ class ChangeSet:
                     self.type = self.type[:-2]
                 else:
                     self.type = self.type[:-1]
+            elif self.location[0].lower() != 'v':
+                raise ValueError('Sql not in correct version folder % ' % kwargs['file'])
         else:
             self.location = kwargs['location']
             self.schema = kwargs['schema']
@@ -34,9 +36,9 @@ class ChangeSet:
         self.file = os.path.join(self.location, self.types, self.schema, self.name + '.sql')
         self.fullname ='%s.%s' % (self.schema, self.name)
         self.author = kwargs['author']
-        liquibase_sql = '--liquibase formatted sql'
-        self.is_formated_sql = liquibase_sql == self.sql[0:len(liquibase_sql)]
-
+        self.is_formated_sql = self.sql.startswith('--liquibase formatted sql')
+        if (kwargs.get('rollback_file', None)):
+            self.rollback_file = os.path.join(self.location, self.types, self.schema, self.name + '.rollback.sql')
 
     def __str__(self):
         return self.fullname

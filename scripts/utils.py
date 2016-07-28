@@ -2,16 +2,8 @@ import os
 import git
 import config
 from changeset import ChangeSet
-import logging
 import sys
-
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger()
-logging.StreamHandler(sys.stdout)
-#ch.setLevel(logging.DEBUG)
-#formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-#ch.setFormatter(formatter)
-#logger.addHandler(ch)
+from config import logger
 
 def get_repo(basedir):
     repopath = find_repo(basedir)
@@ -55,22 +47,32 @@ def get_changesets(dir):
     #sqldir = dir[len(config.MOUNT_PATH):]
     if dir.endswith('/'):
         dir = dir[:-1]
-    for f in files:
-        file_path = os.path.join(config.MOUNT_PATH, f)
-        if file_path.startswith(dir) and f.endswith('.sql'):
-            logger.info('File changeset %s', f)
+    for file in files:
+        file_path = os.path.join(config.MOUNT_PATH, file)
+        if file_path.startswith(dir) and file.endswith('.sql') and not file.endswith('.rollback.sql'):
+            logger.info('SQL file changed %s', file)
             if not os.path.exists(file_path):
+                logger.debug('File has been deleted %s', file_path)
                 continue
-            author = get_author(dir, f)
+            author = get_author(dir, file)
+            rollback_file = get_rollback_file(file, files)
             try:
                 sql = open(file_path, 'r').read()
                 f = file_path[len(dir)+1:]
-                cs = ChangeSet(file=f, sql=sql, author=author)
+                cs = ChangeSet(file=f, sql=sql, rollback_file=rollback_file, author=author)
                 pos = get_dependency_position(cs, changesets)
                 changesets.insert(pos, cs)
             except Exception as err:
-                logger.debug('file has not been committed %s', err)
+                logger.debug(err)
     return changesets
+
+def get_rollback_file(sqlfile, files):
+    rollback_file = '%s.rollback.sql' % sqlfile[:-4]
+    for f in files:
+        if rollback_file == f:
+            logger.debug('Rollback file for %s: %s', rollback_file, f)
+            return f
+    return None
 
 def get_dependency_position(changeset, changesets):
 
@@ -81,14 +83,12 @@ def get_dependency_position(changeset, changesets):
         # if in the list it is referernced in the sql
         cs_name = cs.fullname.lower()
         sql = cs.sql.lower()
-        #print(cs_name, this_sql)
         if cs_name in this_sql or cs.type in ['tablespace']:
             pos = i + 1
-            #print ('%s is in %s' % (cs_name, this_name))
+            logger.debug('%s is in %s' % (cs_name, this_name))
         # if this object is in the sql in the list
-        # but
         if this_name in sql:
-            #print ('this %s is in %s' % (this_name, cs.name))
+            logger.debug('this %s is in %s' % (this_name, cs.name))
             pos = i
             break
     return pos
@@ -127,7 +127,12 @@ def get_directory_versions(dir):
 def get_releases(dir):
     repo = get_repo(dir)
     tags = []
-    output = repo.git.ls_remote('--tags')
+    try:
+        output = repo.git.ls_remote('--tags')
+    except:
+        logger.critical('Cannot get tags from remote server')
+        # TODO clean up a bit nicer
+        sys.exit(1)
     output += '\n' + repo.git.tag()
     if output:
         tags = output.split('\n')
@@ -146,14 +151,6 @@ def is_new_file(dir, file):
             return False
         except Exception as err:
             logger.debug('file not in release %s', err)
-            # TODO check the error type
-            pass
-    else:
-        try:
-            ret = repo.git.log(file)
-            return False
-        except Exception as err:
-            logger.debug('file has not been committed %s', err)
             # TODO check the error type
             pass
     return True

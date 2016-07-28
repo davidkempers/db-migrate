@@ -5,10 +5,11 @@ import sys
 import select
 import csv
 import argparse
-import dbmigrate
+import migrate
 import exporter
 from generate import create_changelog
 import config
+import logging
 
 def usage(name=None):
     return '''dbmigrate <command> [options]
@@ -25,6 +26,7 @@ def usage(name=None):
 	                    Defaults to CWD (required)
 	    -s --sqldir     SQL directory if different to project directory. Relative
 	                    path to Project directory (optional)
+	    -l --loglevel   Change the log level. Default 'info' (optional)
 	command options:
 	    Run dbmigrate <command> --help for command usage'''
 
@@ -37,10 +39,10 @@ class MyParser(argparse.ArgumentParser):
 def main(argv):
 
     def update(args):
-        dbmigrate.update(args.database, args.sqldir, args.version, args.outputsql)
+        migrate.update(args.database, args.sqldir, args.version, args.outputsql, args.loglevel)
 
     def rollback(args):
-        dbmigrate.rollback(args.database, args.sqldir, args.version, args.outputsql)
+        migrate.rollback(args.database, args.sqldir, args.version, args.outputsql, args.loglevel)
 
     def export(args):
         sqldir = os.path.join(config.MOUNT_PATH, args.sqldir)
@@ -64,6 +66,8 @@ def main(argv):
                      help='Database uri username/password@host:port/sid')
     parser.add_argument('-s', '--sqldir',
                      help='SQL directory relative to the working directory')
+    parser.add_argument('-l', '--loglevel',
+                     help='Log level (default info): debug, info, warning, error, critical')
 
     subparsers = parser.add_subparsers()
     parser_update = subparsers.add_parser('update')
@@ -73,9 +77,9 @@ def main(argv):
     parser_update.set_defaults(func=update)
 
     parser_rollback = subparsers.add_parser('rollback')
-    parser_rollback.add_argument('version', help='Version')
+    parser_rollback.add_argument('version', nargs='?', default=None, help='Version')
     parser_rollback.add_argument('-o', '--outputsql', action='store_true',
-                                 help='Output sql and not apply changes')
+                                 help='Output sql and not rollback')
     parser_rollback.set_defaults(func=rollback)
 
     parser_export = subparsers.add_parser('export')
@@ -89,6 +93,9 @@ def main(argv):
                                  help='Specify the author in the changesets')
 
     args = parser.parse_args()
+    if args.loglevel and args.loglevel.upper() in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
+        config.logger.setLevel(logging.getLevelName(args.loglevel.upper()))
+
     args.func(args)
 
 
