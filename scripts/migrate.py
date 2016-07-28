@@ -96,7 +96,7 @@ def execute(cmd, dburi, xmlpath, loglevel='info'):
 
         for fd in ret[0]:
             if fd == p.stdout.fileno():
-                read = p.stdout.readline()
+                read = p.stdout.readline().strip()
                 sys.stdout.write(read)
             if fd == p.stderr.fileno():
                 read = p.stderr.readline()
