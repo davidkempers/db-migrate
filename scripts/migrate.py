@@ -96,11 +96,11 @@ def execute(cmd, dburi, xmlpath, loglevel='info'):
 
         for fd in ret[0]:
             if fd == p.stdout.fileno():
-                read = p.stdout.readline().strip()
+                read = p.stdout.readline()
                 sys.stdout.write(read)
             if fd == p.stderr.fileno():
                 read = p.stderr.readline()
-                logger.info(read)
+                logger.info(read.strip())
 
         if p.poll() != None:
             break

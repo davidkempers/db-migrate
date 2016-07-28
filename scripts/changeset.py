@@ -35,7 +35,7 @@ class ChangeSet:
             self.types = self.type
         self.file = os.path.join(self.location, self.types, self.schema, self.name + '.sql')
         self.fullname ='%s.%s' % (self.schema, self.name)
-        self.author = kwargs['author']
+        self.author = kwargs.get('author', 'system')
         self.is_formated_sql = self.sql.startswith('--liquibase formatted sql')
         if (kwargs.get('rollback_file', None)):
             self.rollback_file = os.path.join(self.location, self.types, self.schema, self.name + '.rollback.sql')
