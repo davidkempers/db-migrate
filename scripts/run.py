@@ -13,22 +13,22 @@ import logging
 
 def usage(name=None):
     return '''dbmigrate <command> [options]
-	Usage: dbmigrate <command> [options]
-	command (required):
-	    generate        Create changelogs by reading SQL directory and git changes
-	    update          Run update database migrations
-	    rollback        Run database rollback
-	    diff            Create a db diff between update and rollback
-	    export          Export the schema of an existing database
-	common options:
-	    -d --database   Database uri username/password@host:port/sid (required)
-	    -w --working    Project directory with Git repo. Full path required.
-	                    Defaults to CWD (required)
-	    -s --sqldir     SQL directory if different to project directory. Relative
-	                    path to Project directory (optional)
-	    -l --loglevel   Change the log level. Default 'info' (optional)
-	command options:
-	    Run dbmigrate <command> --help for command usage'''
+        Usage: dbmigrate <command> [options]
+        command (required):
+            generate        Create changelogs by reading SQL directory and git changes
+            update          Run update database migrations
+            rollback        Run database rollback
+            diff            Create a db diff between update and rollback
+            export          Export the schema of an existing database
+        common options:
+            -d --database   Database uri username/password@host:port/sid (required)
+            -w --working    Project directory with Git repo. Full path required.
+                            Defaults to CWD (required)
+            -s --sqldir     SQL directory if different to project directory. Relative
+                            path to Project directory (optional)
+            -l --loglevel   Change the log level. Default 'info' (optional)
+        command options:
+            Run dbmigrate <command> --help for command usage'''
 
 class MyParser(argparse.ArgumentParser):
     def error(self, message):
@@ -48,7 +48,7 @@ def main(argv):
         sqldir = os.path.join(config.MOUNT_PATH, args.sqldir)
         if args.parsefile:
             csvfile = os.path.join(config.MOUNT_PATH, args.parsefile)
-            exporter.tosql(sqldir, csvfile)
+            exporter.csv_to_sqlfile(sqldir, csvfile)
         else:
             exporter.export(args.database, sqldir)
 

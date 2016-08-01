@@ -35,8 +35,10 @@ def get_changesets(dir):
     files = []
     if last_release:
         output = repo.git.diff('--name-only', last_release)
-        if output:
-            files = output.split('\n')
+    else:
+        output = repo.git.ls_tree('-r', 'HEAD', '--name-only')
+    if output:
+        files = output.split('\n')
     # get pre-commit files
     output = repo.git.diff('--cached', '--name-only')
     for f in output.split('\n'):

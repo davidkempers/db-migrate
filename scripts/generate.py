@@ -9,7 +9,7 @@ from config import logger
 def create_changelog(dir, sqldir):
     changesets = utils.get_changesets(dir)
     if len(changesets) == 0:
-        logger.info('No sql file changes detected in %s' % dir)
+        logger.info('No sql file changes detected in %s\nUse git add <file>' % dir)
         return
 
     installxml = os.path.join(sqldir, 'install.xml')
