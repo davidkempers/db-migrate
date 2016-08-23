@@ -76,23 +76,57 @@ def get_rollback_file(sqlfile, files):
             return f
     return None
 
+type_order = {
+    'tablespace': 1,
+    'profile': 2,
+    'role': 3,
+    'user': 4,
+    'tablespace_quota': 5,
+    'role_grant': 6,
+    'system_grant': 6,
+    'default_role': 7,
+    'type_spec': 8,
+    'db_link': 8,
+    'synonym': 9,
+    'sequence': 10,
+    'table': 11,
+    'view': 12,
+    'materialized_view': 12,
+    'package_spec': 12,
+    'package_body': 12,
+    'procedure': 12,
+    'function': 12,
+    'trigger': 13,
+    'object_grant': 14
+}
+
 def get_dependency_position(changeset, changesets):
 
     pos = 0
     this_name = changeset.fullname.lower()
     this_sql = changeset.sql.lower()
     for i, cs in enumerate(changesets):
-        # if in the list it is referernced in the sql
+
         cs_name = cs.fullname.lower()
-        sql = cs.sql.lower()
-        if cs_name in this_sql or cs.type in ['tablespace']:
+
+        if type_order.get(changeset.type) > type_order.get(cs.type):
             pos = i + 1
-            logger.debug('%s is in %s' % (cs_name, this_name))
-        # if this object is in the sql in the list
-        if this_name in sql:
-            logger.debug('this %s is in %s' % (this_name, cs.name))
+            logger.debug('%s.%s is after %s.%s' % (changeset.type, this_name, cs.type, cs_name))
+        elif type_order.get(changeset.type) < type_order.get(cs.type):
             pos = i
+            logger.debug('%s.%s is before %s.%s' % (changeset.type, this_name, cs.type, cs_name))
             break
+        else:
+            # if in the list it is referernced in the sql
+            sql = cs.sql.lower()
+            if cs_name in this_sql:# or cs.type in ['tablespace', 'profile']:
+                pos = i + 1
+                logger.debug('%s is in %s' % (cs_name, this_name))
+            # if this object is in the sql in the list
+            if this_name in sql:
+                logger.debug('this %s is in %s' % (this_name, cs.name))
+                pos = i
+                break
     return pos
 
 def get_last_release(dir):

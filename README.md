@@ -27,25 +27,27 @@ You will need to tag Git with your release versions. The tag name **must** match
 `install` contains changesets that **must** only be run once when the database is installed. It may contain the following
 
     +-- install
-        +-- indexes
-        +-- fixtures
-        +-- sequences
-        +-- tables
-            +-- schemaname
+        +-- schemaname
+            +-- indexes
+            +-- fixtures
+            +-- sequences
+            +-- tables
                 +-- tablename.sql
-        +-- users
-            +-- username.sql
+        +-- system
+            +-- tablespaces
+            +-- users
+                +-- username.sql
 
 `latest` contains replaceable objects. They can be from the initial installation or changes in releases.
 
     +-- latest
-        +-- packages
-            +-- schemaname
+        +-- schemaname
+            +-- packages
                 +-- packagename.sql
-        +-- procedures
-        +-- triggers
-        +-- types
-        +-- views
+            +-- procedures
+            +-- triggers
+            +-- types
+            +-- views
 
 The other directories contain alteration SQL changes for a release. These **must** only be for changes to objects in the `install` directory or data changes.
 

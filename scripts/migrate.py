@@ -2,10 +2,11 @@
 
 import os.path
 import utils
-from subprocess import Popen, PIPE
+import subprocess
 import select
 import sys
 from config import logger
+import liquibase
 
 def update(dburi, sqldir, version, outputsql=False, loglevel='info'):
 
@@ -14,6 +15,9 @@ def update(dburi, sqldir, version, outputsql=False, loglevel='info'):
         cmd = 'updateSQL'
 
     if version == 'install':
+        if utils.is_new_file(sqldir, 'install.xml'):
+            logger.warning('You should commit install.xml to prevent this file being overwritten with new sql file changes')
+
         xmlpath = os.path.join(sqldir, 'install.xml')
         logger.info('Installing database changesets')
     else:
@@ -26,7 +30,15 @@ def update(dburi, sqldir, version, outputsql=False, loglevel='info'):
             # make sure we're on the correct version
             repo.git.checkout(version)
 
-    execute(cmd, dburi, xmlpath, loglevel)
+    liquibase.execute(cmd, dburi, xmlpath, loglevel)
+    
+    
+    show_invalid_object(dburi)
+    
+    compile_invalid_objects(dburi)
+    
+    show_invalid_object(dburi)
+    
 
 def rollback(dburi, sqldir, version, outputsql=False, loglevel='info'):
 
@@ -65,43 +77,50 @@ def rollback(dburi, sqldir, version, outputsql=False, loglevel='info'):
         return
 
     logger.info('Rolling back to %s' % version)
-    execute(cmd, dburi, xmlpath, loglevel)
+    liquibase.execute(cmd, dburi, xmlpath, loglevel)
 
-def execute(cmd, dburi, xmlpath, loglevel='info'):
+    
+def show_invalid_object(dburi):
 
-    username, password, uri = utils.parse_dburi(dburi)
-
-    if not loglevel:
-        loglevel = 'info'
-    elif loglevel.lower() in ['error', 'critical']:
-        loglevel = 'severe'
-    elif loglevel.lower() not in ['debug', 'info', 'warning']:
-        loglevel = 'off'
-
-    # now apply the update (this will also tag the database)
-    cmd = 'liquibase --changeLogFile=%s --driver=oracle.jdbc.OracleDriver \
-           --classpath=/usr/local/bin/ojdbc6.jar \
-           --username=%s \
-           --password=%s \
-           --url jdbc:oracle:thin:@%s \
-           --logLevel=%s %s' % (xmlpath, username, password, uri, loglevel.lower(), cmd)
-
+    sql = '''select status,count(*)
+             from dba_objects
+             group by status
+             order by status;'''
+    cmd = 'sqlplus -s %s <<EOF\n%s\nEOF' % (dburi, sql)
     logger.debug(cmd)
+    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+    
+    logger.info('Invalid Objects')
+    logger.info(p.stdout.read())
+                
+def compile_invalid_objects(dburi):
 
-    p = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
-
-    while True:
-        reads = [p.stdout.fileno(), p.stderr.fileno()]
-        ret = select.select(reads, [], [])
-
-        for fd in ret[0]:
-            if fd == p.stdout.fileno():
-                read = p.stdout.readline()
-                sys.stdout.write(read)
-            if fd == p.stderr.fileno():
-                read = p.stderr.readline()
-                logger.info(read.strip())
-
-        if p.poll() != None:
-            break
-    p.wait()
+    sql = '''set head off
+    select 'alter '||object_type||' '||owner||'.'||object_name|| ' compile;'
+from dba_objects
+where owner='YOURSCHEMA' and
+status='INVALID' and
+object_type <> 'PACKAGE BODY'
+union
+select 'alter package '||owner||'.'||object_name||' compile body;'
+from dba_objects
+where 
+status='INVALID' and
+object_type = 'PACKAGE BODY';'''
+             
+    cmd = 'sqlplus -s %s <<EOF\n%s\nEOF' % (dburi, sql)
+    logger.debug(cmd)
+    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+    
+    
+    logger.info('Compiling Objects')
+    
+    sql = p.stdout.read()
+   
+    logger.info(sql)
+    
+    cmd = 'sqlplus -s %s <<EOF\n%s\nEOF' % (dburi, sql)
+    logger.debug(cmd)
+    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+       
+    logger.info(p.stdout.read())

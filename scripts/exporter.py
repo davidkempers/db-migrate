@@ -51,12 +51,13 @@ def csv_to_sqlfile(outdir, csvfile):
                 schema = row[1].lower().strip()
                 name = row[2].lower().strip()
                 type = row[3].lower().strip()
-                sql = row[0].lower().strip();
+                sql = row[0]
                 sql = sql.replace('"', '')
-                if type in ['index', 'sequence', 'table', 'tablespace']:
-                    location = 'install'
-                else:
+                sql = correct_sql(type, name, sql)
+                if type in ['package', 'package_spec', 'package_body', 'trigger', 'view', 'function', 'type_spec', 'procedure', 'synonym']:
                     location = 'latest'
+                else:
+                    location = 'install'
 
                 cs = ChangeSet(location=location, schema=schema, name=name, type=type, sql=sql)
 
@@ -67,3 +68,47 @@ def csv_to_sqlfile(outdir, csvfile):
 
                 with open(fileout, 'w+') as fout:
                     fout.write(cs.sql)
+
+def correct_sql(type, name, sql):
+    # just hack this for now
+    if type == 'tablespace':
+        if 'datafile' in sql:
+            return """create tablespace %s datafile
+  '%s_01.dbf' size 30M autoextend on
+  logging online permanent blocksize 8192
+  extent management local autoallocate default
+ nocompress  segment space management auto""" % (name, name)
+        else:
+            return """create temporary tablespace %s tempfile
+  '%s_01.dbf' size 32m
+  autoextend on
+  next 32m maxsize 2048m
+  extent management local"""  % (name, name)
+
+    if type in ['object_grant', 'role_grant', 'system_grant']:
+        return sql.replace('\n', ';\n')
+    if type == 'table':
+        sql = sql.replace('segment creation deferred', 'segment creation immediate')
+        ret = []
+        constraint = False
+        for line in sql.split('\n'):
+            line = line.rstrip(' ')
+            if 'constraint' in line and 'foreign key' in line:
+                constraint = True
+            elif constraint and 'references' in line:
+                constraint = False
+                if not line.endswith(','):
+                    if len(ret) == 0:
+                        print(line, sql, ret)
+                    elif ret[-1].endswith(','):
+                        ret[-1] = ret[-1].rstrip(',')
+            else:
+                ret.append(line)
+        return '\n'.join(ret)
+    if type == 'trigger':
+        ret = []
+        for line in sql.split('\n'):
+            if 'alter trigger ' not in line:
+                ret.append(line)
+        return '\n'.join(ret)
+    return sql

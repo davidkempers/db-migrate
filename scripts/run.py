@@ -7,6 +7,7 @@ import csv
 import argparse
 import migrate
 import exporter
+import dbdocs
 from generate import create_changelog
 import config
 import logging
@@ -20,6 +21,7 @@ def usage(name=None):
             rollback        Run database rollback
             diff            Create a db diff between update and rollback
             export          Export the schema of an existing database
+            dbdoc           Output docs for the database
         common options:
             -d --database   Database uri username/password@host:port/sid (required)
             -w --working    Project directory with Git repo. Full path required.
@@ -59,6 +61,9 @@ def main(argv):
         dir = os.path.join(config.MOUNT_PATH, args.sqldir)
         create_changelog(dir, args.sqldir)
 
+    def dbdoc(args):
+        dbdocs.create(args.database, args.sqldir, args.loglevel)
+
     parser = MyParser(description='Migration scripts for oracle database',
                                      usage=usage())
 
@@ -91,6 +96,9 @@ def main(argv):
     parser_generate.set_defaults(func=generate)
     parser_generate.add_argument('-a', '--author',
                                  help='Specify the author in the changesets')
+
+    parser_doc = subparsers.add_parser('dbdoc')
+    parser_doc.set_defaults(func=dbdoc)
 
     args = parser.parse_args()
     if args.loglevel and args.loglevel.upper() in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:

@@ -44,6 +44,8 @@ def create_installxml(dir, changesets):
         elem_sf = etree.Element('sqlFile')
         elem_sf.set('path', cs.file)
         elem_sf.set('relativeToChangelogFile', 'true')
+        if cs.type in ['package_spec', 'package_body', 'trigger', 'function', 'procedure']:
+            elem_sf.set('endDelimiter', '\n;;')
         elem_cs.append(elem_sf)
 
         root.append(elem_cs)
@@ -69,10 +71,10 @@ def create_updatexml(dir):
 
     root = get_changelogxml(xmlfile)
 
-    include = etree.Element('include')
-    include.set('file', 'install.xml')
-    include.set('relativeToChangelogFile', 'true')
-    root.append(include)
+    #include = etree.Element('include')
+    #include.set('file', 'install.xml')
+    #include.set('relativeToChangelogFile', 'true')
+    #root.append(include)
 
     for version in utils.get_directory_versions(dir):
         include = etree.Element('include')
@@ -110,7 +112,17 @@ def create_versionxml(dir, sqldir, version, changesets):
         os.remove(xmlfile)
     root = get_changelogxml(xmlfile)
 
+    charlen = 0
     for i, cs in enumerate(changesets):
+    
+        # show a process bar as this seems to take a while sometimes
+        for p in range(int(round(i / float(len(changesets)) * 100.0)) - charlen):
+            if i == 0:
+                sys.stderr.write('|                                          Percent Complete                                          |\n')
+            charlen += 1
+            sys.stderr.write('-')
+            if i == len(changesets) - 1:
+                sys.stderr.write('\n')
 
         if cs.location == 'latest':
             # move back a directory for relative path
@@ -128,10 +140,13 @@ def create_versionxml(dir, sqldir, version, changesets):
             elem_cs = etree.Element('changeSet')
             elem_cs.set('id', '%s-%d' % (version, i + 1))
             elem_cs.set('author', cs.author)
+            elem_cs.set('runOnChange', 'true')
 
             elem_sf = etree.Element('sqlFile')
             elem_sf.set('path', relative_path)
             elem_sf.set('relativeToChangelogFile', 'true')
+            if cs.type in ['package_spec', 'package_body', 'trigger', 'function', 'procedure']:
+                elem_sf.set('endDelimiter', '\n;;')
             elem_sf.set('stripComments', 'true')
             elem_cs.append(elem_sf)
 
@@ -162,6 +177,8 @@ def create_versionxml(dir, sqldir, version, changesets):
                         elem_sqlfile = etree.Element('sqlFile')
                         elem_sqlfile.set('path', relative_path)
                         elem_sqlfile.set('relativeToChangelogFile', 'true')
+                        if cs.type in ['package_spec', 'package_body', 'trigger', 'function', 'procedure']:
+                            elem_sf.set('endDelimiter', '\n;;')
                         elem_sqlfile.set('stripComments', 'true')
                         elem_rb.append(elem_sqlfile)
             elem_cs.append(elem_rb)
